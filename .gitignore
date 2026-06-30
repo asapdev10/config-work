@@ -1,0 +1,8 @@
+# Stow conflict marker
+.stow-local-ignore
+
+# Machine-local overrides — never commit these (identity, secrets, env)
+*.local
+.gitconfig.local
+.env
+.env.local

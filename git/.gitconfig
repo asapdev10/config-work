@@ -1,0 +1,32 @@
+# Machine-local identity (user.name, user.email, signing key, any host-specific
+# url rewrites) lives in ~/.gitconfig.local — untracked, so nothing private is
+# committed here. Create it on each machine:
+#
+#   [user]
+#     name = Your Name
+#     email = you@work.example
+#
+[include]
+  path = ~/.gitconfig.local
+[init]
+  defaultBranch = main
+[core]
+  pager = delta
+[interactive]
+  diffFilter = delta --color-only
+[delta]
+  navigate = true
+  side-by-side = true
+[merge]
+  conflictstyle = zdiff3
+[diff]
+  tool = difftastic
+[difftool]
+  prompt = false
+[difftool "difftastic"]
+  cmd = difft "$LOCAL" "$REMOTE"
+[alias]
+  dft = difftool
+  dfts = difftool --staged
+  dlog = -c diff.external=difft log --ext-diff
+  dshow = -c diff.external=difft show --ext-diff

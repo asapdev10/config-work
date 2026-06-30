@@ -1,0 +1,4 @@
+# Press . on a commit (in main or diff view) to render it through delta
+# in a paged subview — gives you delta's polish without leaving tig.
+bind main . !sh -c "git show %(commit) | delta --paging=always"
+bind diff . !sh -c "git show %(commit) | delta --paging=always"

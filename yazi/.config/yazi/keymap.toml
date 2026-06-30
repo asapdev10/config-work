@@ -1,0 +1,33 @@
+#
+# [[manager.prepend_keymap]]
+# on = "z"
+# run = "plugin fzf-jump"
+# desc = "Fuzzy find and jump to subdirectory"
+#
+#
+# [[manager.prepend_keymap]]
+# on = "t"
+# run = "shell --block --confirm 'echo Config is loaded!'"
+# desc = "Test config"
+
+# [mgr]
+# prepend_keymap = [
+#   { on = "z", run = """
+#     shell --block '
+#     dir=$(fd --type d --hidden --exclude .git --max-depth 5 . | fzf --preview "ls -la {}" --height 60% --reverse)
+#     [ -n "$dir" ] && echo "cd \"$dir\""
+#   '
+#     """, desc = "Fuzzy find and jump to subdirectory" }
+# ]
+
+
+[mgr]
+prepend_keymap = [
+  { on = "z", run = """
+    shell --block '
+    dir=$(fd --type d --hidden --exclude .git --max-depth 5 . | fzf --preview "ls -la {}" --reverse)
+    [ -n "$dir" ] && ya emit cd "$dir"
+  '
+    """, desc = "Fuzzy find and jump to subdirectory" },
+  { on = "-", run = "leave", desc = "Go back to the parent directory" },
+]
