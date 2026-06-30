@@ -230,7 +230,7 @@ gst() {
 
 # ── fkill: pick process(es) — pid · name · [dir] · cmdline, enter signals ────
 #   [dir] = basename of the process's cwd, the only tell for `go run`/`npm`
-#   style temp binaries (e.g. bomtrail shows as comm=main). cmdline truncated.
+#   style temp binaries (e.g. a `go run` build shows as comm=main). cmdline truncated.
 #   sorted by CPU. arg = signal.
 fkill() {
   local sig="${1:-TERM}" pids
