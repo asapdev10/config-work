@@ -2,7 +2,7 @@
 # Usage: `just <recipe>`
 
 # Stow packages, in install order. Edit this list to add/remove packages.
-PACKAGES := "bash git nvim wezterm zellij yazi delta tig"
+PACKAGES := "zsh git nvim zellij yazi delta claude"
 
 # Single source of truth for installed CLI tools (brew bundle format).
 BREWFILE := justfile_directory() / "tools/Brewfile"

@@ -1,4 +1,4 @@
-# ~/lab/config/tools/Brewfile — single source of truth for installed CLI tools.
+# ~/lab/config-work/tools/Brewfile — single source of truth for installed CLI tools.
 #
 # Managed with `brew bundle` (Homebrew 5.x), which handles brew, cargo, go,
 # uv, and npm entries from this one file.
@@ -9,8 +9,9 @@
 #   just tools-cleanup   list (or remove) anything installed but NOT listed here
 #
 # OS built-ins from curr-cli.md (sed, awk, xargs, less, curl, sort/uniq/cut/
-# tr/tee, strace, lsof, ss) are intentionally NOT tracked here — they ship with
-# the system.
+# tr/tee, lsof) are intentionally NOT tracked here — they ship with the system.
+# Note: macOS has no `ss` or `strace` — the fzf helpers use `lsof` (sockets) and
+# there's no dtruss-free strace equivalent; install one from brew if you need it.
 
 # ── Modern CLI toolkit (from notes/work/learning/curr-cli.md) ──────────────
 brew "ripgrep"      # rg — content search
@@ -22,6 +23,7 @@ brew "jq"           # JSON query
 brew "bat"          # cat with highlighting
 brew "eza"          # modern ls (fzf dir previews)
 brew "git-delta"    # diff pager
+brew "lazygit"      # git TUI (shell `lg` alias + nvim <leader>gg)
 brew "zellij"       # terminal multiplexer
 brew "tmux"         # terminal multiplexer (alt)
 brew "zoxide"       # smarter cd
@@ -43,7 +45,6 @@ brew "btop"         # process viewer (graphs)
 brew "tlrc"         # tldr client
 brew "typst"        # typesetting
 brew "gh"           # github CLI
-brew "neonctl"      # neon postgres CLI (neon/neonctl — create dbs, conn strings)
 
 # ── Language servers / formatters (consumed by Claude Code, VSCode) ────────
 brew "lua-language-server"  # lua LSP
@@ -51,22 +52,11 @@ brew "stylua"               # lua formatter
 
 # ── Other brew tools already in use ────────────────────────────────────────
 brew "bob"          # neovim version manager
+brew "tree-sitter"  # parser builder for nvim-treesitter (main branch)
 brew "stow"         # dotfiles symlink manager
 brew "ffmpeg"       # media transcoding
 brew "webp"         # webp encode/decode
 
-# ── Go toolchain (kept on `go install` to match the active toolchain) ──────
-go "github.com/air-verse/air"
-go "github.com/golangci/golangci-lint/v2/cmd/golangci-lint"
-go "golang.org/x/tools/gopls"
-go "github.com/DarthSim/overmind/v2"
-go "github.com/sqlc-dev/sqlc/cmd/sqlc"
-
-# ── Rust project tooling (toolchain-coupled, kept on cargo) ─────────────────
-cargo "sqlx-cli"
-
-# ── uv tools ────────────────────────────────────────────────────────────────
-uv "gallery-dl"
-
-# ── npm globals ──────────────────────────────────────────────────────────────
-npm "corepack"
+# ── Fonts (casks, macOS) ───────────────────────────────────────────────────
+# Nerd Font for terminal glyphs (iTerm2 profile font + nvim/zellij/yazi icons).
+cask "font-jetbrains-mono-nerd-font"

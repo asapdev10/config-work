@@ -1,14 +1,15 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 
 alias n='nvim'
 alias lg='lazygit'
-alias r='source ~/.bashrc'
-alias rl='source ~/.bashrc'
-alias ll='ls -al --time-style="+%Y-%m-%d %H:%M:%S" | awk "{\$3=\"\"; \$4=\"\"; print}" | sed "s/  / /g"'
-alias lc='ls --format=single-column'
+alias r='source ~/.zshrc'
+alias rl='source ~/.zshrc'
+# eza replaces GNU `ls` here — macOS BSD ls has no --time-style. --no-user drops
+# the owner column (eza omits group by default), matching the old awk-stripped view.
+alias ll='eza -la --no-user --time-style="+%Y-%m-%d %H:%M:%S"'
+alias lc='eza -1'
 alias gcb='git checkout $(git branch | fzf | sed "s/^[* ]*//")'
 alias sqlite='sqlite3'
-alias fly='flyctl'
 alias python='python3'
 alias cs='cd ~/lab/config-work && just stow-install'
 alias lgcfg='lazygit -p=$HOME/lab/config-work'

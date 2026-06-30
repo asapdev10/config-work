@@ -25,31 +25,29 @@ cat > ~/.gitconfig.local <<'EOF'
   email = you@work.example
 EOF
 
-# Optional shell env (GOPRIVATE, tokens, etc.) — sourced by variables.bash
+# Optional shell env (GOPRIVATE, tokens, etc.) — sourced by ~/.zshenv
 # echo 'export GOPRIVATE=...' >> ~/.env.local
 ```
 
-If `just stow-install` refuses because a real `~/.bashrc` already exists, either
-delete it first or run `stow --adopt --target="$HOME" bash` once and inspect
+If `just stow-install` refuses because a real `~/.zshrc` already exists, either
+delete it first or run `stow --adopt --target="$HOME" zsh` once and inspect
 `git diff` before keeping anything it pulled in.
+
+The `claude` package stows into `~/.claude/`, which Claude Code populates with
+live state (`projects/`, `*.jsonl`, ledgers). Stow leaves those alone and links
+only the tracked config files — but if a real `~/.claude/settings.json` or
+`~/.claude/CLAUDE.md` already exists it'll refuse; back them up or
+`stow --adopt --target="$HOME" claude` and review the diff.
 
 ## Packages
 
 | Package    | Stows to                    | What it is                          |
 |------------|-----------------------------|-------------------------------------|
-| `bash`     | `~/.bashrc`, `~/.bashrc.d/`  | shell entry point + modular configs |
+| `zsh`      | `~/.zshenv`, `~/.zshrc`, `~/.zshrc.d/` | shell env + entry point + modular configs |
 | `git`      | `~/.gitconfig`              | git config + delta/difftastic (identity in `~/.gitconfig.local`) |
 | `nvim`     | `~/.config/nvim/`           | neovim                              |
-| `wezterm`  | `~/.config/wezterm/`        | terminal                            |
 | `zellij`   | `~/.config/zellij/`         | terminal multiplexer                |
 | `yazi`     | `~/.config/yazi/`           | file manager                        |
 | `delta`    | `~/.config/delta/`          | git diff theme                      |
-| `tig`      | `~/.config/tig/`            | git TUI                             |
+| `claude`   | `~/.claude/`                | Claude Code config: CLAUDE.md, settings, hooks, commands, skills (NO auto-memory — built fresh per machine) |
 
-## What's intentionally NOT here
-
-Excluded from the personal dotfiles to keep this work-machine-safe: Claude Code
-config + auto-memory, VSCode workspaces, personal `scripts/`, the OPNsense CLI,
-project scaffolding templates, Windows/WSL packages, and the Linux `Aptfile`.
-The shell config is mac-first (Homebrew prefix auto-detected; clipboard via
-`pbcopy`) but still works unchanged on Linuxbrew.

@@ -1,10 +1,11 @@
-#!/bin/bash
-# fzf cockpit — fd/rg/plocate are the engines, fzf is the interactive layer.
-# Design rationale lives in the planning brief (fzf.md). Functions:
+#!/usr/bin/env zsh
+# fzf cockpit — fd/rg are the engines, fzf is the interactive layer. macOS build:
+# the Linux helpers (ss/plocate/proc) are reworked onto lsof/mdfind/BSD ps.
+# Functions:
 #   fdi   file finder (one fd walk, in-memory filter, hidden toggle)
 #   rgi   live content grep (re-runs rg per keystroke), opens at the match line
 #   rgr   find-replace via sd (git-guarded), multi-select files, preview diff
-#   loci  whole-FS filename search via the plocate index (instant)
+#   loci  whole-FS filename search via Spotlight's mdfind (instant)
 #   dcp   pick any directory and copy its path to the clipboard
 #   fj    pick + run a just recipe from the cwd justfile
 #   gco   switch git branch (local + remote), preview its log
@@ -14,9 +15,13 @@
 #   fport pick a listening socket and kill its owning process
 #   ghci  repos whose latest CI run failed (fzf-picks gh account + owner)
 #   fz    fuzzy menu of every fzf helper here (computed at runtime)
-#   clip  copy stdin to the clipboard (local or remote-over-ssh/tmux)
-# fz discovers tools by parsing the "# ── name: desc ──" headers below, so any
-# new helper that follows that convention and uses fzf shows up automatically.
+# clip (copy stdin to the clipboard) lives in ~/.zshenv so fzf's become/execute
+# subshells can reach it. fz discovers tools by parsing the "# ── name: desc ──"
+# headers below, so any new helper following that convention shows up here too.
+
+# Path to THIS file, captured at source time so fz() can parse its own headers
+# (zsh has no $BASH_SOURCE; %x = the file being sourced).
+typeset -g _FZF_COCKPIT_SRC="${(%):-%x}"
 
 # ── shared prune list ────────────────────────────────────────────────────────
 # Dirs that are pure noise in every interactive search — pruned even when hidden
@@ -38,33 +43,6 @@ export FZF_ALT_C_OPTS="--preview 'eza -la --color=always {} 2>/dev/null || ls -l
 # preview pane from the keyboard: shift-↑/↓ = line, alt-↑/↓ = page; ctrl-/ hides
 # it. The mouse wheel scrolls the preview too, out of the box.
 export FZF_DEFAULT_OPTS="--bind 'shift-up:preview-up,shift-down:preview-down,alt-up:preview-page-up,alt-down:preview-page-down,ctrl-/:toggle-preview'"
-
-# ── clip: copy stdin to the clipboard, local or remote ───────────────────────
-# Prefers a native local backend, then clip.exe (WSL → Windows clipboard), and
-# finally OSC 52 so a path reaches the *local* machine's clipboard over ssh/tmux
-# (e.g. when working on the home server). OSC 52 needs tmux `set-clipboard on`.
-clip() {
-  local data; data="$(cat)"; [ -z "$data" ] && return
-  if command -v pbcopy >/dev/null 2>&1; then
-    printf '%s' "$data" | pbcopy
-  elif [ -n "$WAYLAND_DISPLAY" ] && command -v wl-copy >/dev/null 2>&1; then
-    printf '%s' "$data" | wl-copy
-  elif [ -n "$DISPLAY" ] && command -v xclip >/dev/null 2>&1; then
-    printf '%s' "$data" | xclip -selection clipboard
-  elif command -v clip.exe >/dev/null 2>&1; then
-    printf '%s' "$data" | clip.exe
-  else
-    local b64; b64="$(printf '%s' "$data" | base64 | tr -d '\n')"
-    if [ -n "$TMUX" ]; then
-      printf '\033Ptmux;\033\033]52;c;%s\007\033\\' "$b64"
-    else
-      printf '\033]52;c;%s\007' "$b64"
-    fi
-  fi
-}
-# Export so fzf's non-interactive become/execute subshells (which don't source
-# .bashrc) can still reach clip — otherwise it errors "clip: command not found".
-export -f clip
 
 # ── fdi: file finder, ctrl-h toggles hidden+ignored ──────────────────────────
 # Shows hidden + git-ignored files by default (so .env.prod and friends surface)
@@ -123,11 +101,13 @@ rgr() {
     | xargs -0 -r sd "$pat" "$rep"
 }
 
-# ── loci: whole-FS filename search via the plocate index (instant) ───────────
+# ── loci: whole-FS filename search via Spotlight's mdfind (instant) ──────────
+# macOS equivalent of the Linux plocate index. mdfind -name matches file names;
+# each keystroke re-queries the live Spotlight index.
 loci() {
-  fzf --disabled --prompt 'locate> ' \
+  fzf --disabled --prompt 'spotlight> ' \
       --bind 'start:reload:true' \
-      --bind 'change:reload:plocate {q} 2>/dev/null || true' \
+      --bind 'change:reload:mdfind -name {q} 2>/dev/null || true' \
       --preview 'bat --color=always {} 2>/dev/null || ls -la {}' \
       --bind "enter:become($EDITOR {})"
 }
@@ -225,48 +205,42 @@ gst() {
         --bind 'ctrl-a:execute-silent(if git diff --cached --quiet -- {2}; then git add -- {2}; else git reset -q -- {2}; fi)+reload(git -c color.status=always status --short)' \
     | awk '{print $2}')
   [ -z "$files" ] && return
-  ${EDITOR:-vi} $files
+  ${EDITOR:-vi} ${=files}
 }
 
-# ── fkill: pick process(es) — pid · name · [dir] · cmdline, enter signals ────
-#   [dir] = basename of the process's cwd, the only tell for `go run`/`npm`
-#   style temp binaries (e.g. a `go run` build shows as comm=main). cmdline truncated.
-#   sorted by CPU. arg = signal.
+# ── fkill: pick process(es) — pid · %cpu · command, enter signals ────────────
+#   sorted by CPU. arg = signal (default TERM). Uses BSD ps (-r CPU sort, `=`
+#   suppresses headers); the Linux build's /proc cwd column is dropped — macOS
+#   has no /proc and an lsof-per-process lookup would be far too slow here.
 fkill() {
   local sig="${1:-TERM}" pids
-  pids=$(ps -eo pid,comm,args --no-headers --sort=-pcpu 2>/dev/null \
-    | while read -r pid comm args; do
-        local cwd; cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null)
-        printf '%-7s %-15s %-14s %s\n' "$pid" "$comm" "[${cwd##*/}]" "${args:0:60}"
-      done \
+  pids=$(ps -axo pid=,pcpu=,command= -r 2>/dev/null \
+    | awk '{ pid=$1; cpu=$2; cmd=$0; sub(/^[ ]*[0-9]+[ ]+[0-9.]+[ ]+/, "", cmd); \
+             printf "%-7s %5s%%  %s\n", pid, cpu, substr(cmd, 1, 90) }' \
     | fzf --multi --prompt "kill -$sig> " \
         --header "tab: multi-select  ·  enter: kill -$sig  (pass a signal to fkill for another)" \
     | awk '{print $1}')
   [ -z "$pids" ] && return
-  echo "$pids" | xargs -r kill -"$sig" && echo "sent SIG$sig to: $(echo $pids | tr '\n' ' ')"
+  echo "$pids" | xargs kill -"$sig" && echo "sent SIG$sig to: $(echo $pids | tr '\n' ' ')"
 }
 
-# ── fport: pick a listening socket (address · process · pid), enter kills it ─
+# ── fport: pick a listening socket (addr · process · pid), enter kills it ────
+#   macOS lsof replaces Linux ss. lsof shows only your own sockets unprivileged;
+#   if nothing's visible it re-runs under sudo to reveal system ports.
 fport() {
-  local sel pid raw
-  # ss only reveals a socket's process to its owner; system ports are masked
-  # unless ss runs as root. Try unprivileged, escalate only if nothing's visible.
-  raw=$(ss -tlnpH 2>/dev/null)
-  if ! grep -q 'pid=' <<<"$raw"; then
-    echo "fport: process info hidden — re-running ss as root…" >&2
-    raw=$(sudo ss -tlnpH 2>/dev/null) || return
+  local raw sel pid
+  raw=$(lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null)
+  if [ -z "$raw" ]; then
+    echo "fport: nothing visible — re-running lsof as root…" >&2
+    raw=$(sudo lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null) || return
   fi
-  # Reformat into columns; pid=N is preserved so the kill grep still works.
-  sel=$(printf '%s\n' "$raw" | awk '
-    {
-      name = "-"; pid = "pid=?"
-      if (match($0, /"[^"]+"/))    name = substr($0, RSTART + 1, RLENGTH - 2)
-      if (match($0, /pid=[0-9]+/)) pid  = substr($0, RSTART, RLENGTH)
-      printf "%-24s %-16s %s\n", $4, name, pid
-    }' \
+  # lsof columns: COMMAND PID USER ... NAME(=$9, e.g. *:8080). Reformat to
+  # addr · process · pid=N so the kill grep below still works.
+  sel=$(printf '%s\n' "$raw" \
+    | awk 'NR>1 { printf "%-24s %-16s pid=%s\n", $9, $1, $2 }' | sort -u \
     | fzf --prompt 'port> ' --header 'addr · process · pid  —  enter: kill (SIGTERM)')
   [ -z "$sel" ] && return
-  pid=$(printf '%s\n' "$sel" | grep -oP 'pid=\K[0-9]+' | head -1)
+  pid=$(printf '%s\n' "$sel" | grep -oE 'pid=[0-9]+' | grep -oE '[0-9]+' | head -1)
   [ -z "$pid" ] && { echo "fport: no pid for that socket" >&2; return 1; }
   if kill "$pid" 2>/dev/null; then
     echo "killed pid $pid ($(ps -o comm= -p "$pid" 2>/dev/null))"
@@ -283,11 +257,12 @@ fport() {
 ghci() {
   command -v gh >/dev/null 2>&1 || { echo "ghci: gh not installed" >&2; return 1; }
   local acct="$1" owner="$2" orig fails
-  orig=$(gh auth status --active 2>&1 | grep -oP 'account \K\S+')
+  # BSD grep has no -P/\K — pull the account token with sed instead.
+  orig=$(gh auth status --active 2>&1 | sed -nE 's/.*account ([^[:space:]]+).*/\1/p' | head -1)
 
   # No account → pick from the logged-in gh accounts.
   if [ -z "$acct" ]; then
-    acct=$(gh auth status 2>&1 | grep -oP 'account \K\S+' | sort -u \
+    acct=$(gh auth status 2>&1 | sed -nE 's/.*account ([^[:space:]]+).*/\1/p' | sort -u \
       | fzf --prompt 'gh account> ' --header 'enter: account to scan as')
     [ -z "$acct" ] && return
   fi
@@ -321,14 +296,15 @@ ghci() {
 # Self-maintaining: parses the "# ── name: desc ──" headers above and keeps only
 # functions that actually use fzf (so clip and the _*_prune helpers drop out).
 fz() {
-  local src="${BASH_SOURCE[0]}" line rest name desc out=""
+  local src="$_FZF_COCKPIT_SRC" line rest name desc out=""
   while IFS= read -r line; do
     case $line in
       '# ── '[a-z]*': '*'──'*)
         rest=${line#'# ── '}
         name=${rest%%:*}
         [[ $name == fz || $name == clip ]] && continue
-        declare -f "$name" 2>/dev/null | grep -q '\bfzf\b' || continue
+        [[ -n ${functions[$name]} ]] || continue
+        print -r -- "${functions[$name]}" | grep -qw fzf || continue
         desc=${rest#*: }; desc=${desc%% ──*}
         out+=$(printf '%-7s %s' "$name" "$desc")$'\n'
         ;;
@@ -336,7 +312,7 @@ fz() {
   done < "$src"
   local sel
   sel=$(printf '%s' "$out" | fzf --prompt 'fzf tools> ' --header 'enter: run it' \
-    --preview "sed -n '/^{1}() {/,/^}/p' \"$src\" | bat --color=always -l bash --style=plain" \
+    --preview "sed -n '/^{1}() {/,/^}/p' \"$src\" | bat --color=always -l zsh --style=plain" \
     --preview-window 'right,62%' \
     --bind 'ctrl-d:preview-half-page-down,ctrl-u:preview-half-page-up' | awk '{print $1}')
   [ -n "$sel" ] && "$sel"

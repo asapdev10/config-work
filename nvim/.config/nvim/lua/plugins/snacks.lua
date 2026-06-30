@@ -1,4 +1,4 @@
--- Mirrors the shell fzf cockpit (~/lab/config/bash/.bashrc.d/fzf.bash):
+-- Mirrors the shell fzf cockpit (~/.zshrc.d/fzf.zsh):
 -- find/grep show hidden + git-ignored files by default, with this prune list
 -- keeping package/build dirs out. Keep this list in sync with FZF_PRUNE_DIRS.
 local prune = {
