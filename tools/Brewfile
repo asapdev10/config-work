@@ -45,6 +45,8 @@ brew "btop"         # process viewer (graphs)
 brew "tlrc"         # tldr client
 brew "typst"        # typesetting
 brew "gh"           # github CLI
+brew "awscli"       # AWS CLI (aws)
+brew "lazysql"      # database TUI
 
 # ── Language servers / formatters (consumed by Claude Code, VSCode) ────────
 brew "lua-language-server"  # lua LSP
@@ -52,7 +54,7 @@ brew "stylua"               # lua formatter
 
 # ── Other brew tools already in use ────────────────────────────────────────
 brew "bob"          # neovim version manager
-brew "tree-sitter"  # parser builder for nvim-treesitter (main branch)
+brew "tree-sitter-cli"  # parser builder for nvim-treesitter (main branch); the `tree-sitter` formula is the lib only
 brew "stow"         # dotfiles symlink manager
 brew "ffmpeg"       # media transcoding
 brew "webp"         # webp encode/decode

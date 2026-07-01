@@ -138,6 +138,7 @@ map("n", "<leader>fl", function()
   Snacks.picker.files({ cwd = dir })
 end, { desc = "find files in ~/lab" })
 map("n", "<leader>fo", function() Snacks.picker.recent() end, { desc = "recent files" })
+map("n", "<leader>fu", function() Snacks.picker.buffers({ format = "file" }) end, { desc = "open buffers" })
 map("n", "<leader>fh", function() Snacks.picker.help() end, { desc = "help tags" })
 map("n", "<leader>fk", function() Snacks.picker.keymaps() end, { desc = "keymaps" })
 
